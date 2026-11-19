@@ -1,5 +1,5 @@
 import 'package:get/get.dart';
-import 'package:rebs_hrms_assignment/features/attendance/presentation/controllers/dashboard_controller.dart';
+import 'package:rebs_hrms_assignment/features/dashboard/controllers/dashboard_controller.dart';
 
 class DashboardBinding extends Bindings {
   @override
