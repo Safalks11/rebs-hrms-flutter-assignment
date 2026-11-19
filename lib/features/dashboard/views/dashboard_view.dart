@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:rebs_hrms_assignment/features/dashboard/controllers/dashboard_controller.dart';
+import 'package:rebs_hrms_assignment/features/dashboard/widgets/attendance_card.dart';
 import 'package:rebs_hrms_assignment/features/dashboard/widgets/employee_card.dart';
 
 class DashboardScreen extends GetView<DashboardController> {
@@ -10,10 +11,20 @@ class DashboardScreen extends GetView<DashboardController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Dashboard')),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: EmployeeCard(employee: controller.employee),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            EmployeeCard(employee: controller.employee),
+            const SizedBox(height: 16),
+            Obx(
+              () => AttendanceCard(
+                attendance: controller.attendance.value,
+                duration: controller.getWorkingDuration,
+              ),
+            ),
+          ],
         ),
       ),
     );
