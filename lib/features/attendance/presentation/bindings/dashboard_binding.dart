@@ -1,0 +1,9 @@
+import 'package:get/get.dart';
+import 'package:rebs_hrms_assignment/features/attendance/presentation/controllers/dashboard_controller.dart';
+
+class DashboardBinding extends Bindings {
+  @override
+  void dependencies() {
+    Get.lazyPut<DashboardController>(() => DashboardController());
+  }
+}
