@@ -1,35 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:rebs_hrms_assignment/core/helper/attendance_formatters.dart';
 import 'package:rebs_hrms_assignment/features/attendance/models/attendance_model.dart';
 
 class AttendanceCard extends StatelessWidget {
   final AttendanceModel attendance;
   final Duration? duration;
+  final VoidCallback onCheckIn;
+  final VoidCallback onCheckOut;
 
-  const AttendanceCard({super.key, required this.attendance, this.duration});
-
-  String formatTime(DateTime? time) {
-    if (time == null) return '--:--';
-    return DateFormat('hh:mm a').format(time);
-  }
-
-  String formatDuration(Duration duration) {
-    final hours = duration.inHours;
-    final minutes = duration.inMinutes.remainder(60);
-
-    return '${hours}h ${minutes}m';
-  }
-
-  String getStatusText(AttendanceStatus status) {
-    switch (status) {
-      case AttendanceStatus.notCheckedIn:
-        return 'Not Checked In';
-      case AttendanceStatus.checkedIn:
-        return 'Checked In';
-      case AttendanceStatus.checkedOut:
-        return 'Checked Out';
-    }
-  }
+  const AttendanceCard({
+    super.key,
+    required this.attendance,
+    this.duration,
+    required this.onCheckIn,
+    required this.onCheckOut,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +30,9 @@ class AttendanceCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            Text('Status: ${getStatusText(attendance.status)}'),
+            Text(
+              'Status: ${AttendanceFormatters.statusText(attendance.status)}',
+            ),
             const SizedBox(height: 12),
 
             Row(
@@ -53,13 +40,13 @@ class AttendanceCard extends StatelessWidget {
                 Expanded(
                   child: _buildTimeInfo(
                     'Check In',
-                    formatTime(attendance.checkInTime),
+                    AttendanceFormatters.formatTime(attendance.checkInTime),
                   ),
                 ),
                 Expanded(
                   child: _buildTimeInfo(
                     'Check Out',
-                    formatTime(attendance.checkOutTime),
+                    AttendanceFormatters.formatTime(attendance.checkOutTime),
                   ),
                 ),
               ],
@@ -70,8 +57,35 @@ class AttendanceCard extends StatelessWidget {
 
             Text(
               'Working Duration: '
-              '${formatDuration(duration ?? attendance.workingDuration)}',
+              '${AttendanceFormatters.formatDuration(duration ?? attendance.workingDuration)}',
             ),
+
+            const SizedBox(height: 16),
+
+            if (attendance.status == AttendanceStatus.notCheckedIn)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: onCheckIn,
+                  child: const Text('Check In'),
+                ),
+              )
+            else if (attendance.status == AttendanceStatus.checkedIn)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: onCheckOut,
+                  child: const Text('Check Out'),
+                ),
+              )
+            else
+              const SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: null,
+                  child: Text('Checked Out'),
+                ),
+              ),
           ],
         ),
       ),

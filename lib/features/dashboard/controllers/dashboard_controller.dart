@@ -11,7 +11,11 @@ class DashboardController extends GetxController {
     department: 'Engineering',
   );
 
+  final int casualLeaveBalance = 8;
+  final int sickLeaveBalance = 5;
+
   late final Rx<AttendanceModel> attendance;
+  late final List<AttendanceModel> _demoHistory;
   final Rx<DateTime> currentTime = DateTime.now().obs;
   Timer? _timer;
 
@@ -21,10 +25,16 @@ class DashboardController extends GetxController {
 
     final now = DateTime.now();
 
-    attendance = AttendanceModel(
-      date: DateTime(now.year, now.month, now.day),
-      checkInTime: DateTime(now.year, now.month, now.day, 1),
-    ).obs;
+    attendance = AttendanceModel(date: DateTime(now.year, now.month, now.day))
+        .obs;
+    _demoHistory = List.generate(5, (index) {
+      final date = DateTime(now.year, now.month, now.day - index - 1);
+      return AttendanceModel(
+        date: date,
+        checkInTime: DateTime(date.year, date.month, date.day, 9),
+        checkOutTime: DateTime(date.year, date.month, date.day, 17),
+      );
+    });
 
     _timer = Timer.periodic(
       Duration(seconds: 10),
@@ -32,19 +42,44 @@ class DashboardController extends GetxController {
     );
   }
 
-  Duration get getWorkingDuration {
-    final now = currentTime.value;
-    final record = attendance.value;
+  List<AttendanceModel> get recentAttendanceRecords => [
+    if (attendance.value.status != AttendanceStatus.notCheckedIn)
+      attendance.value,
+    ..._demoHistory,
+  ].take(5).toList();
 
-    if (record.checkInTime == null) {
-      return Duration.zero;
+  Duration get getWorkingDuration =>
+      attendance.value.workingDurationAt(currentTime.value);
+
+  void checkIn() {
+    if (attendance.value.status != AttendanceStatus.notCheckedIn) {
+      return;
     }
 
-    final duration = (record.checkOutTime ?? now).difference(
-      record.checkInTime!,
-    );
+    final now = DateTime.now();
 
-    return duration.isNegative ? Duration.zero : duration;
+    currentTime.value = now;
+
+    attendance.value = AttendanceModel(
+      date: DateTime(now.year, now.month, now.day),
+      checkInTime: now,
+    );
+  }
+
+  void checkOut() {
+    if (attendance.value.status != AttendanceStatus.checkedIn) {
+      return;
+    }
+
+    final now = DateTime.now();
+
+    currentTime.value = now;
+
+    attendance.value = AttendanceModel(
+      date: attendance.value.date,
+      checkInTime: attendance.value.checkInTime,
+      checkOutTime: now,
+    );
   }
 
   @override

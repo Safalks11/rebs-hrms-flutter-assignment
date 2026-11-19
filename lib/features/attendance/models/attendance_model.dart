@@ -23,11 +23,14 @@ class AttendanceModel {
     return AttendanceStatus.notCheckedIn;
   }
 
-  Duration get workingDuration {
+  Duration get workingDuration => workingDurationAt(DateTime.now());
+
+  Duration workingDurationAt(DateTime now) {
     if (checkInTime == null) {
       return Duration.zero;
     }
 
-    return (checkOutTime ?? DateTime.now()).difference(checkInTime!);
+    final duration = (checkOutTime ?? now).difference(checkInTime!);
+    return duration.isNegative ? Duration.zero : duration;
   }
 }
