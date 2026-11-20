@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../core/utils/company_time.dart';
+import '../../../core/widgets/network_indicator.dart';
 import '../controllers/leave_controller.dart';
 import '../models/leave_request.dart';
 
@@ -49,6 +50,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
       () => ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          const NetworkIndicator(),
           if (controller.loading.value) const LinearProgressIndicator(),
           Text(
             'Available Casual: ${controller.repository.balances[LeaveType.casual] ?? 'Unavailable'} • Sick: ${controller.repository.balances[LeaveType.sick] ?? 'Unavailable'}',

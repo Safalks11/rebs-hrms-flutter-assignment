@@ -7,6 +7,8 @@ import 'package:rebs_hrms_assignment/features/dashboard/widgets/employee_card.da
 import 'package:rebs_hrms_assignment/features/dashboard/widgets/leave_balance_card.dart';
 import 'package:rebs_hrms_assignment/features/dashboard/widgets/recent_attendance_card.dart';
 
+import '../../../core/widgets/network_indicator.dart';
+
 import '../../leave/models/leave_request.dart';
 import '../../leave/services/leave_repository.dart';
 
@@ -31,6 +33,7 @@ class DashboardScreen extends GetView<DashboardController> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const NetworkIndicator(),
             EmployeeCard(employee: controller.employee),
             const SizedBox(height: 16),
             Obx(() {

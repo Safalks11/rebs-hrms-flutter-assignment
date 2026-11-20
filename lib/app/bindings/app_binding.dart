@@ -4,11 +4,13 @@ import 'package:rebs_hrms_assignment/features/attendance/services/attendance_loc
 import 'package:rebs_hrms_assignment/features/attendance/services/attendance_store.dart';
 import 'package:rebs_hrms_assignment/features/office_profile/services/office_profile_store.dart';
 
+import '../../core/services/connectivity_service.dart';
 import '../../features/leave/services/leave_repository.dart';
 
 class AppBinding extends Bindings {
   @override
   void dependencies() {
+    Get.put(ConnectivityService(), permanent: true);
     Get.put<AppDatabase>(AppDatabase(), permanent: true);
     final leave = Get.put(
       LeaveRepository(Get.find<AppDatabase>()),

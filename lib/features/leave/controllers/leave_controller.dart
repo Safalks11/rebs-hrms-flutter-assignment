@@ -1,11 +1,14 @@
 import 'package:get/get.dart';
 
+import '../../../core/services/connectivity_service.dart';
+
 import '../models/leave_request.dart';
 import '../services/leave_repository.dart';
 
 class LeaveController extends GetxController {
   final LeaveRepository repository;
-  LeaveController(this.repository);
+  final ConnectivityService connectivity;
+  LeaveController(this.repository, this.connectivity);
   final loading = false.obs, submitting = false.obs;
   final message = RxnString(
     'Leave submission is unavailable until API integration is added.',
@@ -44,8 +47,21 @@ class LeaveController extends GetxController {
       message.value = error;
       return false;
     }
-    message.value =
-        'Leave submission is unavailable until API integration is added.';
-    return false;
+    submitting.value = true;
+    try {
+      final status = await connectivity.checkNow();
+      if (isClosed) return false;
+      message.value = switch (status) {
+        NetworkStatus.disconnected =>
+          'Connect to a network before submitting leave.',
+        NetworkStatus.unknown =>
+          'Could not determine network status. Retry the connection check.',
+        NetworkStatus.connected =>
+          'Leave submission is unavailable until API integration is added.',
+      };
+      return false;
+    } finally {
+      if (!isClosed) submitting.value = false;
+    }
   }
 }
