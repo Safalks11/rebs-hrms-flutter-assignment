@@ -1,6 +1,6 @@
 # REBS HRMS mock API
 
-Express server for local development. Flutter integration is a separate step. Requires Node.js 20+.
+Express server for local development, used by the Flutter app. Requires Node.js 20+.
 
 ## Start
 
@@ -13,7 +13,7 @@ npm ci
 npm start
 ```
 
-Build Flutter with matching coordinates, for example `flutter run --dart-define=OFFICE_LATITUDE=12.9716 --dart-define=OFFICE_LONGITUDE=77.5946`. Use your real test-office coordinates for both the app and server. The default server address is `127.0.0.1:8080`. For a physical device, set `HOST=0.0.0.0` and use your computer's LAN IP. Android Emulator reaches the host at `10.0.2.2`. Optional: `PORT`, `DATA_FILE` (default `data/state.json`), and `MOCK_DELAY_MS` (default 20000).
+Use your real test-office coordinates for the server. The app downloads and caches them from `GET /office`; it needs no office coordinate build variables. The default server address is `127.0.0.1:8080`. For a physical device, set `HOST=0.0.0.0` and use your computer's LAN IP. Android Emulator reaches the host at `10.0.2.2`. Optional: `PORT`, `DATA_FILE` (default `data/state.json`), and `MOCK_DELAY_MS` (default 20000).
 
 On this machine, select the working Node 24 install with `export PATH="/opt/homebrew/opt/node@24/bin:$PATH"` before npm commands.
 
@@ -23,6 +23,7 @@ Run `npm test` for automated tests. To restore seed data, stop the server, run `
 
 - `GET /health` returns `{"status":"ok"}`.
 - `GET /employee/me` returns demo employee EMP001.
+- `GET /office` returns the server's configured `latitude` and `longitude`.
 - `GET /attendance?month=YYYY-MM` returns `{"events":[]}`.
 - `POST /attendance/events` accepts `id`, `employeeId`, `companyDate`, `type` (`checkIn` or `checkOut`), timezone-aware `timestamp`, `latitude`, and `longitude`.
 - `GET /leave/balance` returns `{"casual":7,"sick":4}` initially.

@@ -24,6 +24,7 @@ test('endpoint contracts and repeatable failures',async t=>{
  const api=await fixture(t);
  assert.equal((await api.request('/health')).body.status,'ok');
  assert.equal((await api.request('/employee/me')).body.id,'EMP001');
+ assert.deepEqual((await api.request('/office')).body,{latitude:0,longitude:0});
  assert.deepEqual((await api.request('/leave/balance')).body,{casual:7,sick:4});
  assert.equal((await api.request('/leave/requests')).body.requests.length,3);
  assert.deepEqual((await api.request('/attendance?month=2026-11')).body.events,[]);
