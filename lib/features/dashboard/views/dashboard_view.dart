@@ -8,7 +8,6 @@ import 'package:rebs_hrms_assignment/features/dashboard/widgets/leave_balance_ca
 import 'package:rebs_hrms_assignment/features/dashboard/widgets/recent_attendance_card.dart';
 
 import '../../../core/widgets/network_indicator.dart';
-
 import '../../leave/models/leave_request.dart';
 import '../../leave/services/leave_repository.dart';
 
@@ -34,6 +33,51 @@ class DashboardScreen extends GetView<DashboardController> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const NetworkIndicator(),
+            Obx(
+              () => Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        controller.isLoading.value
+                            ? 'Loading pending attendance…'
+                            : controller.pendingCount.value == null
+                            ? 'Pending attendance unavailable'
+                            : controller.pendingCount.value == 0
+                            ? 'No pending attendance events'
+                            : '${controller.pendingCount.value} attendance events pending sync',
+                      ),
+                      if (controller.syncMessage.value != null)
+                        Text(controller.syncMessage.value!),
+                      FilledButton(
+                        onPressed:
+                            controller.isLoading.value ||
+                                controller.checkingSync.value ||
+                                controller.isMarkingAttendance.value ||
+                                controller.pendingCount.value == null ||
+                                controller.pendingCount.value == 0
+                            ? null
+                            : controller.syncNow,
+                        child: Text(
+                          controller.checkingSync.value
+                              ? 'Checking…'
+                              : 'Sync Now',
+                        ),
+                      ),
+                      if (controller.pendingCount.value == null &&
+                          !controller.isLoading.value)
+                        TextButton(
+                          onPressed: controller.refreshAttendance,
+                          child: const Text('Retry'),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             EmployeeCard(employee: controller.employee),
             const SizedBox(height: 16),
             Obx(() {

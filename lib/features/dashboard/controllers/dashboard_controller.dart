@@ -11,14 +11,21 @@ import 'package:rebs_hrms_assignment/features/attendance/services/attendance_sto
 import 'package:rebs_hrms_assignment/features/dashboard/models/employee_model.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/services/connectivity_service.dart';
+
 class DashboardController extends GetxController with WidgetsBindingObserver {
   final AttendanceLocationService _locationService;
   final AttendanceStore _attendanceStore;
   final DateTime Function() _now;
+  final ConnectivityService connectivity;
+  final pendingCount = RxnInt();
+  final checkingSync = false.obs;
+  final syncMessage = RxnString();
 
   DashboardController(
     this._locationService,
-    this._attendanceStore, {
+    this._attendanceStore,
+    this.connectivity, {
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
@@ -80,7 +87,10 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
       }
     } finally {
       _isRefreshingAttendance = false;
-      if (!isClosed) isLoading.value = false;
+      if (!isClosed) {
+        await refreshPendingCount();
+        isLoading.value = false;
+      }
     }
   }
 
@@ -152,6 +162,7 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
         ),
       );
       attendanceSaved = true;
+      await refreshPendingCount();
       await _loadAttendance();
       if (!isClosed) {
         actionMessage.value = checkingIn
@@ -178,6 +189,50 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
           unawaited(refreshAttendance());
         }
       }
+    }
+  }
+
+  Future<void> refreshPendingCount() async {
+    try {
+      final count = await _attendanceStore.countPendingEvents(employee.id);
+      if (!isClosed) {
+        pendingCount.value = count;
+        syncMessage.value = null;
+      }
+    } catch (_) {
+      if (!isClosed) {
+        pendingCount.value = null;
+        syncMessage.value = 'Could not read pending attendance. Please retry.';
+      }
+    }
+  }
+
+  Future<void> syncNow() async {
+    if (isClosed ||
+        checkingSync.value ||
+        isLoading.value ||
+        isMarkingAttendance.value) {
+      return;
+    }
+    checkingSync.value = true;
+    try {
+      await refreshPendingCount();
+      if (isClosed || pendingCount.value == null) return;
+      if (pendingCount.value == 0) {
+        syncMessage.value = 'No pending attendance events.';
+        return;
+      }
+      final status = await connectivity.checkNow();
+      if (isClosed) return;
+      syncMessage.value = switch (status) {
+        NetworkStatus.disconnected =>
+          'Connect to a network to sync attendance.',
+        NetworkStatus.unknown =>
+          'Could not check network status. Please retry.',
+        NetworkStatus.connected => 'Sync is not available yet. Your attendance remains saved on this device.',
+      };
+    } finally {
+      if (!isClosed) checkingSync.value = false;
     }
   }
 

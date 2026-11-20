@@ -12,6 +12,14 @@ class AttendanceStore {
   final AppDatabase database;
   AttendanceStore(this.database);
 
+  Future<int> countPendingEvents(String employeeId) async {
+    final rows = await (await database.db).rawQuery(
+      'SELECT COUNT(*) AS total FROM attendance_events WHERE employee_id = ? AND sync_status = ?',
+      [employeeId, 'pending'],
+    );
+    return rows.single['total'] as int;
+  }
+
   Future<void> saveEvent(AttendanceEvent event) async {
     if (event.companyDate != CompanyTime.attendanceDateKey(event.timestamp) ||
         !event.latitude.isFinite ||
