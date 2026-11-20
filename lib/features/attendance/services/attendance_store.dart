@@ -20,6 +20,71 @@ class AttendanceStore {
     return rows.single['total'] as int;
   }
 
+  Future<List<AttendanceEvent>> pendingEvents(String employeeId) async {
+    final rows = await (await database.db).query(
+      'attendance_events',
+      where: 'employee_id = ? AND sync_status = ?',
+      whereArgs: [employeeId, 'pending'],
+      orderBy: 'company_date ASC, timestamp_utc ASC, event_type ASC',
+    );
+    final events = rows.map(AttendanceEvent.fromMap).toList();
+    events.sort((a, b) {
+      final date = a.companyDate.compareTo(b.companyDate);
+      if (date != 0) return date;
+      if (a.type != b.type) {
+        return a.type == AttendanceEventType.checkIn ? -1 : 1;
+      }
+      return a.timestamp.compareTo(b.timestamp);
+    });
+    return events;
+  }
+
+  Future<void> setSyncStatus(
+    String id,
+    AttendanceSyncStatus status, {
+    String? rejectionReason,
+  }) async {
+    await (await database.db).update(
+      'attendance_events',
+      {'sync_status': status.name, 'rejection_reason': rejectionReason},
+      where: 'event_id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> mergeServerEvents(List<AttendanceEvent> events) async {
+    final db = await database.db;
+    await db.transaction((tx) async {
+      for (final event in events) {
+        final byId = await tx.query(
+          'attendance_events',
+          where: 'event_id = ?',
+          whereArgs: [event.id],
+        );
+        if (byId.isNotEmpty) {
+          await tx.update(
+            'attendance_events',
+            {
+              'sync_status': AttendanceSyncStatus.synced.name,
+              'rejection_reason': null,
+            },
+            where: 'event_id = ?',
+            whereArgs: [event.id],
+          );
+          continue;
+        }
+        final sameAction = await tx.query(
+          'attendance_events',
+          where: 'employee_id = ? AND company_date = ? AND event_type = ?',
+          whereArgs: [event.employeeId, event.companyDate, event.type.name],
+        );
+        if (sameAction.isEmpty) {
+          await tx.insert('attendance_events', event.toMap());
+        }
+      }
+    });
+  }
+
   Future<void> saveEvent(AttendanceEvent event) async {
     if (event.companyDate != CompanyTime.attendanceDateKey(event.timestamp) ||
         !event.latitude.isFinite ||
@@ -126,6 +191,13 @@ class AttendanceStore {
       checkInLongitude: checkIn?.longitude,
       checkOutLatitude: checkOut?.latitude,
       checkOutLongitude: checkOut?.longitude,
+      rejectionMessages: [
+        for (final event in events.where(
+          (event) => event.syncStatus == AttendanceSyncStatus.rejected,
+        ))
+          '${event.type == AttendanceEventType.checkIn ? 'Check-in' : 'Check-out'}: '
+              '${event.rejectionReason ?? 'Reason unavailable for earlier rejection.'}',
+      ],
       syncStatus: events.isEmpty
           ? null
           : events.any(

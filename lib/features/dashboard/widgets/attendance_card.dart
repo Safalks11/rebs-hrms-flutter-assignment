@@ -43,6 +43,7 @@ class AttendanceCard extends StatelessWidget {
             ),
             if (attendance.syncStatus != null)
               Text(AttendanceFormatters.syncStatusText(attendance.syncStatus!)),
+            for (final message in attendance.rejectionMessages) Text(message),
             const SizedBox(height: 12),
 
             Row(

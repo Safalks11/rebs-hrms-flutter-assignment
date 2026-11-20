@@ -26,6 +26,13 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Connect to the local mock HRMS server during development.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Your location is used to verify that attendance is marked within 200 metres of the office.</string>
 	<key>UIApplicationSceneManifest</key>

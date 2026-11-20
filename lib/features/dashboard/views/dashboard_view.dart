@@ -69,7 +69,12 @@ class DashboardScreen extends GetView<DashboardController> {
               ),
             ),
             const SizedBox(height: 16),
-            EmployeeCard(employee: controller.employee),
+            Obx(() => EmployeeCard(employee: controller.employee.value)),
+            Obx(
+              () => controller.serverMessage.value == null
+                  ? const SizedBox.shrink()
+                  : Text(controller.serverMessage.value!),
+            ),
             const SizedBox(height: 16),
             Obx(() {
               if (controller.isLoading.value) {

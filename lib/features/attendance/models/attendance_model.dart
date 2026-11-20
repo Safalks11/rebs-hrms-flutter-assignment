@@ -7,6 +7,7 @@ enum AttendanceStatus { notCheckedIn, checkedIn, checkedOut }
 class AttendanceModel {
   final DateTime date;
   final AttendanceSyncStatus? syncStatus;
+  final List<String> rejectionMessages;
   final DateTime? checkInTime;
   final DateTime? checkOutTime;
   final double? checkInLatitude;
@@ -17,6 +18,7 @@ class AttendanceModel {
   const AttendanceModel({
     required this.date,
     this.syncStatus,
+    this.rejectionMessages = const [],
     this.checkInTime,
     this.checkOutTime,
     this.checkInLatitude,

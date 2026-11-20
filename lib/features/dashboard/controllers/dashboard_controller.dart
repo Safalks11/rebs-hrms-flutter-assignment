@@ -10,31 +10,45 @@ import 'package:rebs_hrms_assignment/features/attendance/services/attendance_sto
 import 'package:rebs_hrms_assignment/features/dashboard/models/employee_model.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/services/api_service.dart';
 import '../../../core/services/connectivity_service.dart';
+import '../../attendance/services/attendance_sync_service.dart';
+import '../../leave/services/leave_repository.dart';
+import '../../office_profile/services/office_profile_store.dart';
+import '../services/employee_store.dart';
 
 class DashboardController extends GetxController with WidgetsBindingObserver {
   final AttendanceLocationService _locationService;
   final AttendanceStore _attendanceStore;
   final DateTime Function() _now;
   final ConnectivityService connectivity;
+  final AttendanceSyncService syncService;
+  final ApiService api;
+  final EmployeeStore employeeStore;
+  final LeaveRepository leaveRepository;
+  final OfficeProfileStore officeStore;
   final pendingCount = RxnInt();
   final checkingSync = false.obs;
   final syncMessage = RxnString();
+  final serverMessage = RxnString();
 
   DashboardController(
     this._locationService,
     this._attendanceStore,
-    this.connectivity, {
+    this.connectivity,
+    this.syncService,
+    this.api,
+    this.employeeStore,
+    this.leaveRepository,
+    this.officeStore, {
     DateTime Function()? now,
   }) : _now = now ?? DateTime.now;
 
-  final EmployeeModel employee = const EmployeeModel(
+  final employee = const EmployeeModel(
     id: 'EMP001',
     name: 'Alex Johnson',
     department: 'Engineering',
-  );
-  final int casualLeaveBalance = 8;
-  final int sickLeaveBalance = 5;
+  ).obs;
 
   late final Rx<AttendanceModel> attendance;
   final recentAttendanceRecords = <AttendanceModel>[].obs;
@@ -45,7 +59,9 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
   final actionMessage = RxnString();
   final locationFailure = Rxn<AttendanceLocationFailure>();
   Timer? _workingDurationTimer;
+  Worker? _connectionWorker;
   bool _isRefreshingAttendance = false;
+  bool _refreshingDashboard = false;
 
   @override
   void onInit() {
@@ -53,7 +69,12 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
     currentTime.value = _now();
     attendance = AttendanceModel(date: CompanyTime.attendanceDate(_now())).obs;
     WidgetsBinding.instance.addObserver(this);
-    unawaited(refreshAttendance());
+    unawaited(_initialize());
+    _connectionWorker = ever<NetworkStatus>(connectivity.status, (status) {
+      if (status == NetworkStatus.connected) {
+        unawaited(refreshDashboard());
+      }
+    });
     _workingDurationTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       currentTime.value = _now();
       if (attendance.value.date != CompanyTime.attendanceDate(_now())) {
@@ -66,7 +87,43 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       currentTime.value = _now();
-      unawaited(refreshAttendance());
+      unawaited(refreshDashboard());
+    }
+  }
+
+  Future<void> _initialize() async {
+    try {
+      final cached = await employeeStore.load();
+      if (cached != null && !isClosed) employee.value = cached;
+      await leaveRepository.loadCache();
+    } catch (_) {
+      // Saved attendance remains available independently.
+    }
+    await refreshDashboard();
+  }
+
+  Future<void> refreshDashboard() async {
+    if (isClosed || _refreshingDashboard) return;
+    _refreshingDashboard = true;
+    try {
+      await refreshAttendance();
+      if (isClosed) return;
+      await syncNow();
+      await refreshFromServer();
+      await _refreshLeave();
+    } catch (error) {
+      if (!isClosed) serverMessage.value = api.message(error);
+    } finally {
+      _refreshingDashboard = false;
+    }
+  }
+
+  Future<void> _refreshLeave() async {
+    if (await connectivity.checkNow() != NetworkStatus.connected) return;
+    try {
+      await leaveRepository.refresh();
+    } catch (_) {
+      // Keep cached balances visible.
     }
   }
 
@@ -96,16 +153,64 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
   Future<void> _loadAttendance() async {
     final now = _now();
     final todayAttendance = await _attendanceStore.loadAttendanceForDay(
-      employee.id,
+      employee.value.id,
       now,
     );
     final recentRecords = await _attendanceStore.loadRecentAttendance(
-      employee.id,
+      employee.value.id,
     );
     if (isClosed) return;
     attendance.value = todayAttendance;
     recentAttendanceRecords.assignAll(recentRecords);
     currentTime.value = now;
+  }
+
+  Future<void> refreshFromServer() async {
+    if (await connectivity.checkNow() != NetworkStatus.connected) {
+      if (!isClosed) serverMessage.value = 'Offline. Showing saved data.';
+      return;
+    }
+    try {
+      await officeStore.refresh(api);
+      final response = await api.dio.get<Map<String, dynamic>>('/employee/me');
+      final data = response.data!;
+      final loadedEmployee = EmployeeModel(
+        id: data['id'] as String,
+        name: data['name'] as String,
+        department: data['department'] as String,
+      );
+      await employeeStore.save(loadedEmployee);
+      if (!isClosed) employee.value = loadedEmployee;
+      final company = CompanyTime.toCompanyTime(_now());
+      for (final month in [
+        DateTime.utc(company.year, company.month),
+        DateTime.utc(company.year, company.month - 1),
+      ]) {
+        final key = '${month.year}-${month.month.toString().padLeft(2, '0')}';
+        final response = await api.dio.get<Map<String, dynamic>>(
+          '/attendance',
+          queryParameters: {'month': key},
+        );
+        final events = (response.data!['events'] as List).map((item) {
+          final row = Map<String, dynamic>.from(item as Map);
+          return AttendanceEvent(
+            id: row['id'] as String,
+            employeeId: row['employeeId'] as String,
+            companyDate: row['companyDate'] as String,
+            type: AttendanceEventType.values.byName(row['type'] as String),
+            timestamp: DateTime.parse(row['timestamp'] as String),
+            latitude: (row['latitude'] as num).toDouble(),
+            longitude: (row['longitude'] as num).toDouble(),
+            syncStatus: AttendanceSyncStatus.synced,
+          );
+        }).toList();
+        await _attendanceStore.mergeServerEvents(events);
+      }
+      await _loadAttendance();
+      if (!isClosed) serverMessage.value = null;
+    } catch (error) {
+      if (!isClosed) serverMessage.value = api.message(error);
+    }
   }
 
   Duration get workingDuration =>
@@ -150,7 +255,7 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
       await _attendanceStore.saveEvent(
         AttendanceEvent(
           id: const Uuid().v4(),
-          employeeId: employee.id,
+          employeeId: employee.value.id,
           companyDate: CompanyTime.attendanceDateKey(now),
           type: checkingIn
               ? AttendanceEventType.checkIn
@@ -165,8 +270,8 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
       await _loadAttendance();
       if (!isClosed) {
         actionMessage.value = checkingIn
-            ? 'Check-in saved. Pending Sync.'
-            : 'Check-out saved. Pending Sync.';
+            ? 'Check-in saved.'
+            : 'Check-out saved.';
       }
     } on AttendanceLocationException catch (error) {
       if (!isClosed) {
@@ -184,6 +289,7 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
     } finally {
       if (!isClosed) {
         isMarkingAttendance.value = false;
+        if (attendanceSaved) unawaited(syncNow());
         if (attendance.value.date != CompanyTime.attendanceDate(_now())) {
           unawaited(refreshAttendance());
         }
@@ -193,7 +299,9 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
 
   Future<void> refreshPendingCount() async {
     try {
-      final count = await _attendanceStore.countPendingEvents(employee.id);
+      final count = await _attendanceStore.countPendingEvents(
+        employee.value.id,
+      );
       if (!isClosed) {
         pendingCount.value = count;
         syncMessage.value = null;
@@ -221,15 +329,19 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
         syncMessage.value = 'No pending attendance events.';
         return;
       }
-      final status = await connectivity.checkNow();
-      if (isClosed) return;
-      syncMessage.value = switch (status) {
-        NetworkStatus.disconnected =>
-          'Connect to a network to sync attendance.',
-        NetworkStatus.unknown =>
-          'Could not check network status. Please retry.',
-        NetworkStatus.connected => 'Sync is not available yet. Your attendance remains saved on this device.',
-      };
+      if (await connectivity.checkNow() == NetworkStatus.connected) {
+        try {
+          await officeStore.refresh(api);
+        } catch (_) {
+          // Sync still sends events using their saved coordinates.
+        }
+      }
+      final result = await syncService.sync(employee.value.id);
+      await refreshPendingCount();
+      await _loadAttendance();
+      if (!isClosed) syncMessage.value = result;
+    } catch (error) {
+      if (!isClosed) syncMessage.value = api.message(error);
     } finally {
       if (!isClosed) checkingSync.value = false;
     }
@@ -256,6 +368,7 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
   void onClose() {
     WidgetsBinding.instance.removeObserver(this);
     _workingDurationTimer?.cancel();
+    _connectionWorker?.dispose();
     super.onClose();
   }
 }

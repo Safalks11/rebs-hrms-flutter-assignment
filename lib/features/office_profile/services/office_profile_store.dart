@@ -1,4 +1,5 @@
 import 'package:rebs_hrms_assignment/core/services/app_database.dart';
+import 'package:rebs_hrms_assignment/core/services/api_service.dart';
 import 'package:rebs_hrms_assignment/features/office_profile/models/office_location.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -18,6 +19,17 @@ class OfficeProfileStore {
       latitude: (rows.first['latitude'] as num).toDouble(),
       longitude: (rows.first['longitude'] as num).toDouble(),
     );
+  }
+
+  Future<OfficeLocation> refresh(ApiService api) async {
+    final response = await api.dio.get<Map<String, dynamic>>('/office');
+    final data = response.data!;
+    final location = OfficeLocation(
+      latitude: (data['latitude'] as num).toDouble(),
+      longitude: (data['longitude'] as num).toDouble(),
+    );
+    await save(location);
+    return location;
   }
 
   Future<void> save(OfficeLocation location) async {

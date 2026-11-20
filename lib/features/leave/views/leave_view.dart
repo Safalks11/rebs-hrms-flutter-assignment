@@ -78,7 +78,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
                 : (v) => setState(() => type = v!),
           ),
           TextButton(
-            onPressed: () => pick(true),
+            onPressed: controller.submitting.value ? null : () => pick(true),
             child: Text(
               start == null
                   ? 'Select start date'
@@ -86,7 +86,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
             ),
           ),
           TextButton(
-            onPressed: () => pick(false),
+            onPressed: controller.submitting.value ? null : () => pick(false),
             child: Text(
               end == null ? 'Select end date' : LeaveRequest.dateKey(end!),
             ),
@@ -98,7 +98,7 @@ class _LeaveScreenState extends State<LeaveScreen> {
             maxLines: 3,
           ),
           FilledButton(
-            onPressed: controller.submitting.value
+            onPressed: controller.submitting.value || controller.loading.value
                 ? null
                 : () async {
                     if (start == null || end == null) {

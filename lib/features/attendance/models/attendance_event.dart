@@ -11,6 +11,7 @@ class AttendanceEvent {
   final double latitude;
   final double longitude;
   final AttendanceSyncStatus syncStatus;
+  final String? rejectionReason;
 
   const AttendanceEvent({
     required this.id,
@@ -21,6 +22,7 @@ class AttendanceEvent {
     required this.latitude,
     required this.longitude,
     this.syncStatus = AttendanceSyncStatus.pending,
+    this.rejectionReason,
   });
 
   Map<String, Object?> toMap() => {
@@ -32,6 +34,7 @@ class AttendanceEvent {
     'latitude': latitude,
     'longitude': longitude,
     'sync_status': syncStatus.name,
+    'rejection_reason': rejectionReason,
   };
 
   factory AttendanceEvent.fromMap(Map<String, Object?> row) => AttendanceEvent(
@@ -45,5 +48,6 @@ class AttendanceEvent {
     syncStatus: AttendanceSyncStatus.values.byName(
       row['sync_status'] as String,
     ),
+    rejectionReason: row['rejection_reason'] as String?,
   );
 }

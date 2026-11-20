@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../../../core/services/api_service.dart';
+
 import 'package:get/get.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -8,11 +10,12 @@ import '../models/leave_request.dart';
 
 class LeaveRepository {
   final AppDatabase database;
+  final ApiService api;
   final String employeeId;
   final balances = <LeaveType, int>{}.obs;
   final requests = <LeaveRequest>[].obs;
 
-  LeaveRepository(this.database, {this.employeeId = 'EMP001'});
+  LeaveRepository(this.database, this.api, {this.employeeId = 'EMP001'});
 
   Future<void> saveCache({
     required Map<LeaveType, int> balances,
@@ -84,5 +87,33 @@ class LeaveRepository {
     );
   }
 
-  Future<void> refresh() => loadCache();
+  Future<void> refresh() async {
+    final responseBalance = await api.dio.get<Map<String, dynamic>>(
+      '/leave/balance',
+      queryParameters: {'employeeId': employeeId},
+    );
+    final responseRequests = await api.dio.get<Map<String, dynamic>>(
+      '/leave/requests',
+      queryParameters: {'employeeId': employeeId},
+    );
+    final rawBalance = responseBalance.data!;
+    final parsedBalance = {
+      for (final type in LeaveType.values) type: rawBalance[type.name] as int,
+    };
+    final parsedRequests = (responseRequests.data!['requests'] as List)
+        .map(
+          (item) =>
+              LeaveRequest.fromJson(Map<String, dynamic>.from(item as Map)),
+        )
+        .toList();
+    await saveCache(balances: parsedBalance, requests: parsedRequests);
+  }
+
+  Future<LeaveRequest> submit(LeaveRequest request) async {
+    final response = await api.dio.post<Map<String, dynamic>>(
+      '/leave/requests',
+      data: request.toJson()..remove('status'),
+    );
+    return LeaveRequest.fromJson(response.data!);
+  }
 }

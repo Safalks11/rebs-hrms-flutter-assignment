@@ -35,6 +35,8 @@ class RecentAttendanceCard extends StatelessWidget {
                     records[index].syncStatus!,
                   ),
                 ),
+              for (final message in records[index].rejectionMessages)
+                Text(message),
               Text(
                 'Check In: ${AttendanceFormatters.formatTime(records[index].checkInTime)}',
               ),

@@ -22,6 +22,7 @@ export async function createApi(options,now=()=>new Date()){
  });
  app.get('/health',(req,res)=>res.json({status:'ok'}));
  app.get('/employee/me',(req,res)=>res.json(employee));
+ app.get('/office',(req,res)=>res.json({latitude:options.latitude,longitude:options.longitude}));
  app.get('/leave/balance',(req,res)=>res.json(balances(store.getState())));
  app.get('/leave/requests',(req,res)=>res.json({requests:[...store.getState().requests].sort((a,b)=>b.startDate.localeCompare(a.startDate))}));
  app.get('/attendance',(req,res)=>{

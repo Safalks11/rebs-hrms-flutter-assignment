@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
-import 'package:rebs_hrms_assignment/features/office_profile/models/office_location.dart';
+import 'package:rebs_hrms_assignment/features/office_profile/services/office_profile_store.dart';
 
 class AttendanceLocation {
   final double latitude;
@@ -34,7 +34,7 @@ class AttendanceLocationException implements Exception {
   String get message {
     switch (reason) {
       case AttendanceLocationFailure.officeNotConfigured:
-        return 'Office coordinates are not configured. Set OFFICE_LATITUDE and OFFICE_LONGITUDE for this build.';
+        return 'Office location is unavailable. Connect to the server once before marking attendance.';
       case AttendanceLocationFailure.servicesDisabled:
         return 'Turn on location services and try again.';
       case AttendanceLocationFailure.permissionDenied:
@@ -88,19 +88,14 @@ class GeolocatorGateway implements LocationGateway {
 }
 
 class AttendanceLocationService {
+  final OfficeProfileStore officeStore;
   final LocationGateway gateway;
-  static const _latitude = String.fromEnvironment('OFFICE_LATITUDE');
-  static const _longitude = String.fromEnvironment('OFFICE_LONGITUDE');
 
-  AttendanceLocationService({LocationGateway? gateway})
+  AttendanceLocationService(this.officeStore, {LocationGateway? gateway})
     : gateway = gateway ?? GeolocatorGateway();
 
   Future<AttendanceLocation> validate() async {
-    final latitude = double.tryParse(_latitude);
-    final longitude = double.tryParse(_longitude);
-    final office = latitude == null || longitude == null
-        ? null
-        : OfficeLocation(latitude: latitude, longitude: longitude);
+    final office = await officeStore.load();
     if (office == null || !office.isValid) {
       throw const AttendanceLocationException(
         AttendanceLocationFailure.officeNotConfigured,
