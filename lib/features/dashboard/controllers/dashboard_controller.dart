@@ -11,8 +11,10 @@ import 'package:rebs_hrms_assignment/features/dashboard/models/employee_model.da
 import 'package:uuid/uuid.dart';
 
 import '../../../core/services/api_service.dart';
+import '../../../core/services/app_feedback.dart';
 import '../../../core/services/connectivity_service.dart';
 import '../../attendance/services/attendance_sync_service.dart';
+import '../../leave/models/leave_request.dart';
 import '../../leave/services/leave_repository.dart';
 import '../../office_profile/services/office_profile_store.dart';
 import '../services/employee_store.dart';
@@ -54,6 +56,9 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
   final recentAttendanceRecords = <AttendanceModel>[].obs;
   final currentTime = DateTime.now().obs;
   final isLoading = true.obs;
+  final hasLoadedAttendance = false.obs;
+  final isRefreshing = false.obs;
+  final actionSucceeded = false.obs;
   final isMarkingAttendance = false.obs;
   final storageError = RxnString();
   final actionMessage = RxnString();
@@ -61,7 +66,31 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
   Timer? _workingDurationTimer;
   Worker? _connectionWorker;
   bool _isRefreshingAttendance = false;
-  bool _refreshingDashboard = false;
+  String? _leaveRefreshError;
+
+  DateTime get companyDate => CompanyTime.attendanceDate(currentTime.value);
+  bool get isInitialLoading => isLoading.value && !hasLoadedAttendance.value;
+  bool get showRefreshProgress =>
+      isRefreshing.value && hasLoadedAttendance.value;
+  bool get canRefreshDashboard =>
+      !isClosed && !isRefreshing.value && !isMarkingAttendance.value;
+  bool get canUseSyncActions => canRefreshDashboard && !isLoading.value;
+  bool get canMarkAttendance =>
+      !isClosed &&
+      !isLoading.value &&
+      !isMarkingAttendance.value &&
+      storageError.value == null;
+  bool get hasRejectedAttendance =>
+      attendance.value.rejectionMessages.isNotEmpty ||
+      recentAttendanceRecords.any(
+        (record) => record.syncStatus == AttendanceSyncStatus.rejected,
+      );
+  int? get casualLeaveBalance => leaveRepository.balances[LeaveType.casual];
+  int? get sickLeaveBalance => leaveRepository.balances[LeaveType.sick];
+
+  Future<void> refreshFromUser() async {
+    if (canRefreshDashboard) await refreshDashboard();
+  }
 
   @override
   void onInit() {
@@ -103,26 +132,37 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> refreshDashboard() async {
-    if (isClosed || _refreshingDashboard) return;
-    _refreshingDashboard = true;
+    if (isClosed || isRefreshing.value) return;
+    isRefreshing.value = true;
     try {
       await refreshAttendance();
       if (isClosed) return;
       await syncNow();
       await refreshFromServer();
-      await _refreshLeave();
+      await refreshLeaveBalances();
     } catch (error) {
       if (!isClosed) serverMessage.value = api.message(error);
     } finally {
-      _refreshingDashboard = false;
+      if (!isClosed) {
+        isRefreshing.value = false;
+        final error =
+            storageError.value ?? serverMessage.value ?? _leaveRefreshError;
+        if (error != null) {
+          AppFeedback.show(error, kind: FeedbackKind.error);
+        } else if (connectivity.status.value != NetworkStatus.connected) {
+          AppFeedback.show('Offline. Showing saved dashboard data.');
+        }
+      }
     }
   }
 
-  Future<void> _refreshLeave() async {
+  Future<void> refreshLeaveBalances() async {
+    _leaveRefreshError = null;
     if (await connectivity.checkNow() != NetworkStatus.connected) return;
     try {
       await leaveRepository.refresh();
-    } catch (_) {
+    } catch (error) {
+      _leaveRefreshError = api.message(error);
       // Keep cached balances visible.
     }
   }
@@ -162,12 +202,13 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
     if (isClosed) return;
     attendance.value = todayAttendance;
     recentAttendanceRecords.assignAll(recentRecords);
+    hasLoadedAttendance.value = true;
     currentTime.value = now;
   }
 
   Future<void> refreshFromServer() async {
     if (await connectivity.checkNow() != NetworkStatus.connected) {
-      if (!isClosed) serverMessage.value = 'Offline. Showing saved data.';
+      if (!isClosed) serverMessage.value = null;
       return;
     }
     try {
@@ -220,14 +261,12 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
   Future<void> checkOut() => _markAttendance(checkingIn: false);
 
   Future<void> _markAttendance({required bool checkingIn}) async {
-    if (isClosed ||
-        isLoading.value ||
-        isMarkingAttendance.value ||
-        storageError.value != null) {
+    if (!canMarkAttendance) {
       return;
     }
     isMarkingAttendance.value = true;
     actionMessage.value = null;
+    actionSucceeded.value = false;
     locationFailure.value = null;
     var attendanceSaved = false;
     try {
@@ -269,6 +308,7 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
       await refreshPendingCount();
       await _loadAttendance();
       if (!isClosed) {
+        actionSucceeded.value = true;
         actionMessage.value = checkingIn
             ? 'Check-in saved.'
             : 'Check-out saved.';
@@ -289,6 +329,15 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
     } finally {
       if (!isClosed) {
         isMarkingAttendance.value = false;
+        final result = storageError.value ?? actionMessage.value;
+        if (result != null) {
+          AppFeedback.show(
+            result,
+            kind: actionSucceeded.value && storageError.value == null
+                ? FeedbackKind.success
+                : FeedbackKind.error,
+          );
+        }
         if (attendanceSaved) unawaited(syncNow());
         if (attendance.value.date != CompanyTime.attendanceDate(_now())) {
           unawaited(refreshAttendance());
@@ -314,6 +363,25 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
     }
   }
 
+  Future<void> syncFromUser() async {
+    if (!canUseSyncActions || checkingSync.value) return;
+    await syncNow();
+    if (!isClosed && syncMessage.value == null && pendingCount.value == 0) {
+      AppFeedback.show(
+        'No pending attendance events.',
+        kind: FeedbackKind.success,
+      );
+    }
+  }
+
+  Future<void> retryAttendance() async {
+    if (isClosed || isLoading.value || isMarkingAttendance.value) return;
+    await refreshAttendance();
+    if (!isClosed && storageError.value != null) {
+      AppFeedback.show(storageError.value!, kind: FeedbackKind.error);
+    }
+  }
+
   Future<void> syncNow() async {
     if (isClosed ||
         checkingSync.value ||
@@ -326,7 +394,7 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
       await refreshPendingCount();
       if (isClosed || pendingCount.value == null) return;
       if (pendingCount.value == 0) {
-        syncMessage.value = 'No pending attendance events.';
+        syncMessage.value = null;
         return;
       }
       if (await connectivity.checkNow() == NetworkStatus.connected) {
@@ -343,7 +411,11 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
     } catch (error) {
       if (!isClosed) syncMessage.value = api.message(error);
     } finally {
-      if (!isClosed) checkingSync.value = false;
+      if (!isClosed) {
+        checkingSync.value = false;
+        final result = syncMessage.value;
+        if (result != null) AppFeedback.show(result);
+      }
     }
   }
 

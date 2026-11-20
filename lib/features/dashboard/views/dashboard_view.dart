@@ -1,135 +1,188 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:rebs_hrms_assignment/app/routes/app_routes.dart';
-import 'package:rebs_hrms_assignment/features/dashboard/controllers/dashboard_controller.dart';
-import 'package:rebs_hrms_assignment/features/dashboard/widgets/attendance_card.dart';
-import 'package:rebs_hrms_assignment/features/dashboard/widgets/employee_card.dart';
-import 'package:rebs_hrms_assignment/features/dashboard/widgets/leave_balance_card.dart';
-import 'package:rebs_hrms_assignment/features/dashboard/widgets/recent_attendance_card.dart';
 
-import '../../../core/widgets/network_indicator.dart';
-import '../../leave/models/leave_request.dart';
-import '../../leave/services/leave_repository.dart';
+import '../../../app/routes/app_routes.dart';
+import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_theme.dart';
+import '../../attendance/utils/attendance_formatters.dart';
+import '../controllers/dashboard_controller.dart';
+import '../widgets/attendance_card.dart';
+import '../widgets/dashboard_status.dart';
+import '../widgets/dashboard_sync_banner.dart';
+import '../widgets/employee_card.dart';
+import '../widgets/leave_balance_card.dart';
+import '../widgets/recent_attendance_card.dart';
 
 class DashboardScreen extends GetView<DashboardController> {
   const DashboardScreen({super.key});
 
+  Future<void> _manageLeave() async {
+    await Get.toNamed(AppRoutes.leave);
+    if (!controller.isClosed) await controller.refreshLeaveBalances();
+  }
+
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const NetworkIndicator(),
+  Widget build(BuildContext context) => Theme(
+    data: AppTheme.dashboard(Theme.of(context)),
+    child: Builder(
+      builder: (context) => Scaffold(
+        appBar: AppBar(
+          title: const Text('Dashboard'),
+          actions: [
             Obx(
-              () => Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        controller.isLoading.value
-                            ? 'Loading pending attendance…'
-                            : controller.pendingCount.value == null
-                            ? 'Pending attendance unavailable'
-                            : controller.pendingCount.value == 0
-                            ? 'No pending attendance events'
-                            : '${controller.pendingCount.value} attendance events pending sync',
-                      ),
-                      if (controller.syncMessage.value != null)
-                        Text(controller.syncMessage.value!),
-                      FilledButton(
-                        onPressed:
-                            controller.isLoading.value ||
-                                controller.checkingSync.value ||
-                                controller.isMarkingAttendance.value ||
-                                controller.pendingCount.value == null ||
-                                controller.pendingCount.value == 0
-                            ? null
-                            : controller.syncNow,
-                        child: Text(
-                          controller.checkingSync.value
-                              ? 'Checking…'
-                              : 'Sync Now',
+              () => IconButton(
+                key: const ValueKey('refresh-dashboard'),
+                tooltip: 'Refresh dashboard',
+                onPressed: !controller.canRefreshDashboard
+                    ? null
+                    : controller.refreshFromUser,
+                icon: const Icon(Icons.refresh_rounded),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: SafeArea(
+          top: false,
+          child: RefreshIndicator(
+            onRefresh: controller.refreshFromUser,
+            child: SingleChildScrollView(
+              key: const PageStorageKey('dashboard-scroll'),
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppTheme.dashboardMaxWidth,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppTheme.dashboardPadding,
+                      8,
+                      AppTheme.dashboardPadding,
+                      AppTheme.dashboardSectionGap,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Obx(
+                          () => Text(
+                            '${AttendanceFormatters.formatDate(controller.companyDate)} · IST',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: AppColors.secondaryText),
+                          ),
                         ),
-                      ),
-                      if (controller.pendingCount.value == null &&
-                          !controller.isLoading.value)
-                        TextButton(
-                          onPressed: controller.refreshAttendance,
-                          child: const Text('Retry'),
+                        const SizedBox(height: 12),
+                        Obx(
+                          () =>
+                              EmployeeCard(employee: controller.employee.value),
                         ),
-                    ],
+                        const SizedBox(height: 16),
+                        Obx(
+                          () => DashboardSyncBanner(
+                            network: controller.connectivity.status.value,
+                            pendingCount: controller.pendingCount.value,
+                            syncing: controller.checkingSync.value,
+                            loading: controller.isInitialLoading,
+                            actionsEnabled: controller.canUseSyncActions,
+                            hasRejections: controller.hasRejectedAttendance,
+                            syncMessage: controller.syncMessage.value,
+                            serverMessage: controller.serverMessage.value,
+                            onSync: controller.syncFromUser,
+                            onRetry: controller.refreshFromUser,
+                            onCheckNetwork: controller.connectivity.checkNow,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Obx(
+                          () => SizedBox(
+                            height: 4,
+                            child: controller.showRefreshProgress
+                                ? const LinearProgressIndicator(
+                                    semanticsLabel: 'Refreshing dashboard',
+                                  )
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Obx(() {
+                          if (controller.isInitialLoading) {
+                            return const Card(
+                              child: Padding(
+                                padding: EdgeInsets.all(24),
+                                child: Column(
+                                  children: [
+                                    SizedBox(height: 24),
+                                    CircularProgressIndicator(),
+                                    SizedBox(height: 16),
+                                    Text("Loading today's attendance…"),
+                                    SizedBox(height: 24),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+                          if (controller.storageError.value != null) {
+                            return DashboardMessage(
+                              message: controller.storageError.value!,
+                              tone: StatusTone.error,
+                              action: TextButton(
+                                key: const ValueKey('retry-attendance'),
+                                onPressed: controller.isLoading.value
+                                    ? null
+                                    : controller.retryAttendance,
+                                child: const Text('Retry'),
+                              ),
+                            );
+                          }
+                          return AttendanceCard(
+                            attendance: controller.attendance.value,
+                            durationDisplay: Obx(
+                              () => Text(
+                                AttendanceFormatters.formatDuration(
+                                  controller.workingDuration,
+                                ),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineLarge,
+                              ),
+                            ),
+                            onCheckIn: controller.checkIn,
+                            onCheckOut: controller.checkOut,
+                            isMarkingAttendance:
+                                controller.isMarkingAttendance.value,
+                            actionsEnabled: controller.canMarkAttendance,
+                            actionSucceeded: controller.actionSucceeded.value,
+                            actionMessage: controller.actionMessage.value,
+                            resolutionLabel: controller.resolutionLabel,
+                            onResolveIssue: controller.resolveLocationFailure,
+                          );
+                        }),
+                        const SizedBox(height: AppTheme.dashboardSectionGap),
+                        Obx(
+                          () => LeaveBalanceCard(
+                            casualDays: controller.casualLeaveBalance,
+                            sickDays: controller.sickLeaveBalance,
+                            onManageLeave: _manageLeave,
+                          ),
+                        ),
+                        const SizedBox(height: AppTheme.dashboardSectionGap),
+                        Obx(
+                          () => RecentAttendanceCard(
+                            records: controller.recentAttendanceRecords
+                                .toList(),
+                            loading: controller.isInitialLoading,
+                            error: controller.storageError.value,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            Obx(() => EmployeeCard(employee: controller.employee.value)),
-            Obx(
-              () => controller.serverMessage.value == null
-                  ? const SizedBox.shrink()
-                  : Text(controller.serverMessage.value!),
-            ),
-            const SizedBox(height: 16),
-            Obx(() {
-              if (controller.isLoading.value) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (controller.storageError.value != null) {
-                return Column(
-                  children: [
-                    Text(controller.storageError.value!),
-                    TextButton(
-                      onPressed: controller.refreshAttendance,
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                );
-              }
-              return AttendanceCard(
-                attendance: controller.attendance.value,
-                duration: controller.workingDuration,
-                onCheckIn: controller.checkIn,
-                onCheckOut: controller.checkOut,
-                isMarkingAttendance: controller.isMarkingAttendance.value,
-                actionMessage: controller.actionMessage.value,
-                resolutionLabel: controller.resolutionLabel,
-                onResolveIssue: controller.resolveLocationFailure,
-              );
-            }),
-            const SizedBox(height: 16),
-            Obx(() {
-              final balances = Get.find<LeaveRepository>().balances;
-              return balances.isEmpty
-                  ? const Text('Leave balance unavailable')
-                  : LeaveBalanceCard(
-                      casualDays: balances[LeaveType.casual]!,
-                      sickDays: balances[LeaveType.sick]!,
-                    );
-            }),
-            TextButton(
-              onPressed: () async {
-                await Get.toNamed(AppRoutes.leave);
-                try {
-                  await Get.find<LeaveRepository>().refresh();
-                } catch (_) {}
-              },
-              child: const Text('Manage leave'),
-            ),
-            const SizedBox(height: 16),
-            Obx(
-              () => RecentAttendanceCard(
-                records: controller.recentAttendanceRecords.toList(),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }

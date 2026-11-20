@@ -5,6 +5,7 @@ import 'app/bindings/app_binding.dart';
 import 'app/routes/app_pages.dart';
 import 'app/routes/app_routes.dart';
 import 'app/theme/app_theme.dart';
+import 'core/services/app_feedback.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,7 @@ class RebsHrmsApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return GetMaterialApp(
       title: 'REBS HRMS',
+      scaffoldMessengerKey: AppFeedback.messengerKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       initialBinding: AppBinding(),

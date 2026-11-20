@@ -72,6 +72,14 @@ void main() {
     }
 
     Future<void> reset() async {
+      await waitFor(
+        () =>
+            !controller.isRefreshing.value &&
+            !controller.checkingSync.value &&
+            !controller.isLoading.value &&
+            !controller.isMarkingAttendance.value,
+        'dashboard idle before reset',
+      );
       await run(() async {
         await api.dio.post<void>('/__qa/reset');
         await (await database.db).delete('attendance_events');
@@ -140,10 +148,10 @@ void main() {
       } else {
         // Real device GPS and real HTTP; quick repeated taps must create one event.
         await tester.ensureVisible(
-          find.widgetWithText(ElevatedButton, 'Check In'),
+          find.byKey(const ValueKey('attendance-check-in')),
         );
-        await tester.tap(find.widgetWithText(ElevatedButton, 'Check In'));
-        await tester.tap(find.widgetWithText(ElevatedButton, 'Check In'));
+        await tester.tap(find.byKey(const ValueKey('attendance-check-in')));
+        await tester.tap(find.byKey(const ValueKey('attendance-check-in')));
         await waitFor(
           () =>
               controller.attendance.value.syncStatus ==
@@ -154,9 +162,9 @@ void main() {
           expect((await serverEvents()).length, 1);
         });
         await tester.ensureVisible(
-          find.widgetWithText(ElevatedButton, 'Check Out'),
+          find.byKey(const ValueKey('attendance-check-out')),
         );
-        await tester.tap(find.widgetWithText(ElevatedButton, 'Check Out'));
+        await tester.tap(find.byKey(const ValueKey('attendance-check-out')));
         await waitFor(
           () =>
               controller.attendance.value.status ==
@@ -236,7 +244,7 @@ void main() {
         await tester.ensureVisible(find.text('Submit leave'));
         await tester.tap(find.text('Submit leave'));
         await tester.pump();
-        expect(find.text('Select both dates.'), findsOneWidget);
+        expect(find.text('Select both dates.'), findsWidgets);
         final today = CompanyTime.attendanceDate(DateTime.now());
         LeaveRequest request({
           DateTime? start,

@@ -1,65 +1,76 @@
 # REBS HRMS mock API
 
-Express server for local development, used by the Flutter app. Requires Node.js 20+.
+A local Node.js/Express server for the Flutter app. It saves data in `data/state.json` so attendance and leave requests survive server restarts. Requires Node.js 20+.
 
-## Start
+## Start the server
 
-From this directory:
+From the `mock_api` folder:
 
 ```sh
+npm ci
 export OFFICE_LATITUDE=12.9716
 export OFFICE_LONGITUDE=77.5946
-npm ci
 npm start
 ```
 
-Use your real test-office coordinates for the server. The app downloads and caches them from `GET /office`; it needs no office coordinate build variables. The default server address is `127.0.0.1:8080`. For a physical device, set `HOST=0.0.0.0` and use your computer's LAN IP. Android Emulator reaches the host at `10.0.2.2`. Optional: `PORT`, `DATA_FILE` (default `data/state.json`), and `MOCK_DELAY_MS` (default 20000).
-
-On this machine, select the working Node 24 install with `export PATH="/opt/homebrew/opt/node@24/bin:$PATH"` before npm commands.
-
-Run `npm test` for automated tests. To restore seed data, stop the server, run `npm run reset`, then restart. The JSON file survives restarts and is ignored by Git. Only run one process per data file. Startup fails on corrupt data; reset explicitly if needed. The fresh seed has no attendance and one Pending, one Approved, and one Rejected leave request. Available balances start at 7 Casual and 4 Sick days.
-
-## API
-
-- `GET /health` returns `{"status":"ok"}`.
-- `GET /employee/me` returns demo employee EMP001.
-- `GET /office` returns the server's configured `latitude` and `longitude`.
-- `GET /attendance?month=YYYY-MM` returns `{"events":[]}`.
-- `POST /attendance/events` accepts `id`, `employeeId`, `companyDate`, `type` (`checkIn` or `checkOut`), timezone-aware `timestamp`, `latitude`, and `longitude`.
-- `GET /leave/balance` returns `{"casual":7,"sick":4}` initially.
-- `GET /leave/requests` returns `{"requests":[]}` with the seeded examples.
-- `POST /leave/requests` accepts `id`, `employeeId`, `type` (`casual` or `sick`), `startDate`, `endDate` (YYYY-MM-DD), and `reason`. The saved response includes `status:"pending"`.
-
-Example attendance body:
-
-```json
-{"id":"unique-event-id","employeeId":"EMP001","companyDate":"2026-11-20","type":"checkIn","timestamp":"2026-11-20T09:00:00Z","latitude":12.9716,"longitude":77.5946}
-```
-
-Replace the example date and coordinates with current values. Keep the same ID on retries. A new event returns 201; an identical retry returns 200 even after the 30-day acceptance window. Reusing an ID with changed data returns 409. The server requires check-in before check-out, one session per Asia/Kolkata date, location within 200 metres, and a timestamp no later than now. It accepts today and the previous 29 company dates.
-
-Leave requests require a start date no earlier than today, an end date no earlier than start, at least 10 non-whitespace reason characters, no overlap with Pending or Approved requests, and sufficient balance. All calendar days count. Pending and Approved requests reserve balance; Rejected requests do not.
-
-Errors return `{"code":"...","message":"..."}` with 400 for malformed input, 409 for conflicts, 422 for validation, and 500 for server failures. There is no authentication; use the server only for local development.
-
-## Repeatable scenarios
-
-Send `X-Mock-Scenario` with one of:
-
-- `success` (default)
-- `slow`: delay before processing
-- `timeout-after-commit`: persist POST, then delay the response
-- `server-error`: 500 without mutation
-- `attendance-conflict`: 409 without mutation
-- `leave-rejection`: 422 without mutation
+Use your actual test location for the office coordinates. The server runs at `http://127.0.0.1:8080` by default. Check that it is running:
 
 ```sh
 curl http://127.0.0.1:8080/health
-curl 'http://127.0.0.1:8080/attendance?month=2026-11'
-curl http://127.0.0.1:8080/leave/balance
+```
+
+The response should be `{"status":"ok"}`. For a physical phone, use `HOST=0.0.0.0 npm start` and connect the phone using your computer's local IP. See the [main README](../README.md) for Flutter run commands.
+
+## Available endpoints
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/health` | Check server status |
+| GET | `/employee/me` | Get demo employee EMP001 |
+| GET | `/office` | Get configured office coordinates |
+| GET | `/attendance?month=YYYY-MM` | Get attendance events for a month |
+| POST | `/attendance/events` | Save a check-in or check-out |
+| GET | `/leave/balance` | Get Casual and Sick Leave balances |
+| GET | `/leave/requests` | Get leave history |
+| POST | `/leave/requests` | Submit a leave request |
+
+The fresh demo data has no attendance, three example leave requests, and available balances of 7 Casual and 4 Sick days. There is no login or authentication.
+
+## Test different responses
+
+Add an `X-Mock-Scenario` header to a request:
+
+| Value | Result |
+| --- | --- |
+| `success` | Normal response (default) |
+| `slow` | Delayed response |
+| `timeout-after-commit` | POST is saved, then response is delayed |
+| `server-error` | HTTP 500 |
+| `attendance-conflict` | Attendance POST returns HTTP 409 |
+| `leave-rejection` | Leave POST returns HTTP 422 |
+
+Example:
+
+```sh
 curl -H 'X-Mock-Scenario: server-error' http://127.0.0.1:8080/employee/me
 ```
 
-For an ambiguous timeout, send a valid POST with `curl --max-time 1 -H 'X-Mock-Scenario: timeout-after-commit'`, then retry the same body and ID without the scenario header. Only one record will exist.
+`MOCK_DELAY_MS` controls the delay (default 20000 ms). For a timeout after commit, retry the same POST body with the same event ID. The server returns the saved record instead of creating a duplicate. The Flutter app does not expose a scenario selector; use an HTTP client such as curl to test these scenarios.
 
-AI-assisted development was used for this mock API.
+## Validation rules
+
+Attendance must use employee `EMP001`, valid GPS coordinates within 200 metres of the office, and the Asia/Kolkata company date. Check-in comes before check-out, with one session per day. New events are accepted for today and the previous 29 company dates. Keep the same unique ID for retries.
+
+Leave requests must start today or later, have an end date on or after the start date, include at least 10 non-whitespace characters in the reason, fit the available balance, and avoid overlap with Pending or Approved requests. All calendar days count.
+
+Errors include a `code` and `message`. Invalid input returns HTTP 400, conflicts 409, validation failures 422, and server failures 500.
+
+## Tests and reset
+
+```sh
+npm test
+```
+
+To restore demo data, stop the server, run `npm run reset`, then start it again. Resetting the server does not clear the Flutter app's local SQLite data. Run only one server process per data file. Optional settings are `PORT`, `DATA_FILE`, and `MOCK_DELAY_MS`.
+
+The mock API and its test cases were generated using AI (Codex).
