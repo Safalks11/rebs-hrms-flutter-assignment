@@ -7,6 +7,9 @@ import 'package:rebs_hrms_assignment/features/dashboard/widgets/employee_card.da
 import 'package:rebs_hrms_assignment/features/dashboard/widgets/leave_balance_card.dart';
 import 'package:rebs_hrms_assignment/features/dashboard/widgets/recent_attendance_card.dart';
 
+import '../../leave/models/leave_request.dart';
+import '../../leave/services/leave_repository.dart';
+
 class DashboardScreen extends GetView<DashboardController> {
   const DashboardScreen({super.key});
 
@@ -57,9 +60,23 @@ class DashboardScreen extends GetView<DashboardController> {
               );
             }),
             const SizedBox(height: 16),
-            LeaveBalanceCard(
-              casualDays: controller.casualLeaveBalance,
-              sickDays: controller.sickLeaveBalance,
+            Obx(() {
+              final balances = Get.find<LeaveRepository>().balances;
+              return balances.isEmpty
+                  ? const Text('Leave balance unavailable')
+                  : LeaveBalanceCard(
+                      casualDays: balances[LeaveType.casual]!,
+                      sickDays: balances[LeaveType.sick]!,
+                    );
+            }),
+            TextButton(
+              onPressed: () async {
+                await Get.toNamed(AppRoutes.leave);
+                try {
+                  await Get.find<LeaveRepository>().refresh();
+                } catch (_) {}
+              },
+              child: const Text('Manage leave'),
             ),
             const SizedBox(height: 16),
             Obx(
