@@ -102,15 +102,21 @@ npm test
 
 Tests cover attendance ordering, duplicate prevention, offline persistence and sync, leave validation, API errors, and dashboard states.
 
-## Build a debug APK
+## Install a debug APK on a real Android phone
 
-Use an API address that your test phone can reach:
+1. Connect the phone and computer to the same Wi-Fi network. Find your computer's local IP address. Start the mock API with your real test location and `HOST=0.0.0.0 npm start` (see [mock API setup](mock_api/README.md)). Keep it running.
+2. Open `http://YOUR_COMPUTER_LAN_IP:8080/health` in the phone's browser. It should show `{"status":"ok"}`. If it does not, check the IP address, network, and computer firewall.
+3. From the project root, build the APK with that same IP address:
 
-```sh
-flutter build apk --debug --dart-define=API_BASE_URL=http://YOUR_COMPUTER_LAN_IP:8080
-```
+   ```sh
+   flutter pub get
+   flutter build apk --debug --dart-define=API_BASE_URL=http://YOUR_COMPUTER_LAN_IP:8080
+   ```
 
-The APK will be created at `build/app/outputs/flutter-apk/app-debug.apk`.
+4. The file is `build/app/outputs/flutter-apk/app-debug.apk`. Copy it to the phone and open it to install. Android may ask you to allow installs from the app used to open the file. Alternatively, enable USB debugging, connect the phone, and run `adb install -r build/app/outputs/flutter-apk/app-debug.apk`.
+5. Open REBS HRMS, turn on Location, grant location permission, and load the dashboard online once. For offline attendance, disconnect the phone's network while keeping Location on. Reconnect and tap **Sync Now**.
 
-For submission, include the source code, debug APK, mock API, and a 3–5 minute demo showing online attendance, offline attendance surviving a restart, synchronization, and leave submission.
+The API URL is built into the APK. Rebuild it if your computer's IP address changes. The phone must be able to reach the running mock API for online features. For an emulator-only APK, omit `--dart-define` to use the default `10.0.2.2` address.
+
+
 

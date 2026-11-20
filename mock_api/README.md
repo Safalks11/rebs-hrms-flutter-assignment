@@ -10,16 +10,16 @@ From the `mock_api` folder:
 npm ci
 export OFFICE_LATITUDE=12.9716
 export OFFICE_LONGITUDE=77.5946
-npm start
+HOST=0.0.0.0 npm start
 ```
 
-Use your actual test location for the office coordinates. The server runs at `http://127.0.0.1:8080` by default. Check that it is running:
+Use your actual test location for the office coordinates. `HOST=0.0.0.0` lets a physical phone on the same Wi-Fi network reach the server. Keep this terminal running. On the computer, check:
 
 ```sh
 curl http://127.0.0.1:8080/health
 ```
 
-The response should be `{"status":"ok"}`. For a physical phone, use `HOST=0.0.0.0 npm start` and connect the phone using your computer's local IP. See the [main README](../README.md) for Flutter run commands.
+The response should be `{"status":"ok"}`. On the phone, open `http://YOUR_COMPUTER_LAN_IP:8080/health` in its browser. If it does not load, check the computer's IP address, Wi-Fi network, and firewall. Build the debug APK with that same IP address, as shown in the [main README](../README.md). Android Emulator can still connect through `http://10.0.2.2:8080`.
 
 ## Available endpoints
 
