@@ -1,133 +1,183 @@
 import 'dart:async';
 
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:rebs_hrms_assignment/app/routes/app_routes.dart';
+import 'package:rebs_hrms_assignment/core/utils/company_time.dart';
+import 'package:rebs_hrms_assignment/features/attendance/models/attendance_event.dart';
 import 'package:rebs_hrms_assignment/features/attendance/models/attendance_model.dart';
 import 'package:rebs_hrms_assignment/features/attendance/services/attendance_location_service.dart';
+import 'package:rebs_hrms_assignment/features/attendance/services/attendance_store.dart';
 import 'package:rebs_hrms_assignment/features/dashboard/models/employee_model.dart';
+import 'package:uuid/uuid.dart';
 
-class DashboardController extends GetxController {
+class DashboardController extends GetxController with WidgetsBindingObserver {
   final AttendanceLocationService _locationService;
+  final AttendanceStore _attendanceStore;
+  final DateTime Function() _now;
 
-  DashboardController(this._locationService);
+  DashboardController(
+    this._locationService,
+    this._attendanceStore, {
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
 
   final EmployeeModel employee = const EmployeeModel(
     id: 'EMP001',
     name: 'Alex Johnson',
     department: 'Engineering',
   );
-
   final int casualLeaveBalance = 8;
   final int sickLeaveBalance = 5;
 
   late final Rx<AttendanceModel> attendance;
-  late final List<AttendanceModel> _demoHistory;
-  final Rx<DateTime> currentTime = DateTime.now().obs;
-  final RxBool isCheckingLocation = false.obs;
-  final RxnString actionMessage = RxnString();
-  final Rxn<AttendanceLocationFailure> locationFailure =
-      Rxn<AttendanceLocationFailure>();
-  Timer? _timer;
+  final recentAttendanceRecords = <AttendanceModel>[].obs;
+  final currentTime = DateTime.now().obs;
+  final isLoading = true.obs;
+  final isMarkingAttendance = false.obs;
+  final storageError = RxnString();
+  final actionMessage = RxnString();
+  final locationFailure = Rxn<AttendanceLocationFailure>();
+  Timer? _workingDurationTimer;
+  bool _isRefreshingAttendance = false;
 
   @override
   void onInit() {
     super.onInit();
-
-    final now = DateTime.now();
-    attendance = AttendanceModel(date: DateTime(now.year, now.month, now.day))
-        .obs;
-    _demoHistory = List.generate(5, (index) {
-      final date = DateTime(now.year, now.month, now.day - index - 1);
-      return AttendanceModel(
-        date: date,
-        checkInTime: DateTime(date.year, date.month, date.day, 9),
-        checkOutTime: DateTime(date.year, date.month, date.day, 17),
-      );
+    currentTime.value = _now();
+    attendance = AttendanceModel(date: CompanyTime.attendanceDate(_now())).obs;
+    WidgetsBinding.instance.addObserver(this);
+    unawaited(refreshAttendance());
+    _workingDurationTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      currentTime.value = _now();
+      if (attendance.value.date != CompanyTime.attendanceDate(_now())) {
+        unawaited(refreshAttendance());
+      }
     });
-
-    _timer = Timer.periodic(
-      const Duration(seconds: 10),
-      (_) => currentTime.value = DateTime.now(),
-    );
   }
 
-  List<AttendanceModel> get recentAttendanceRecords => [
-    if (attendance.value.status != AttendanceStatus.notCheckedIn)
-      attendance.value,
-    ..._demoHistory,
-  ].take(5).toList();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      currentTime.value = _now();
+      unawaited(refreshAttendance());
+    }
+  }
 
-  Duration get getWorkingDuration =>
+  Future<void> refreshAttendance() async {
+    if (isClosed || _isRefreshingAttendance || isMarkingAttendance.value) {
+      return;
+    }
+    _isRefreshingAttendance = true;
+    isLoading.value = true;
+    try {
+      await _loadAttendance();
+      if (!isClosed) storageError.value = null;
+    } catch (_) {
+      if (!isClosed) {
+        storageError.value =
+            'We could not load your saved attendance. Please try again.';
+      }
+    } finally {
+      _isRefreshingAttendance = false;
+      if (!isClosed) isLoading.value = false;
+    }
+  }
+
+  Future<void> _loadAttendance() async {
+    final now = _now();
+    final todayAttendance = await _attendanceStore.loadAttendanceForDay(
+      employee.id,
+      now,
+    );
+    final recentRecords = await _attendanceStore.loadRecentAttendance(
+      employee.id,
+    );
+    if (isClosed) return;
+    attendance.value = todayAttendance;
+    recentAttendanceRecords.assignAll(recentRecords);
+    currentTime.value = now;
+  }
+
+  Duration get workingDuration =>
       attendance.value.workingDurationAt(currentTime.value);
 
   Future<void> checkIn() => _markAttendance(checkingIn: true);
-
   Future<void> checkOut() => _markAttendance(checkingIn: false);
 
   Future<void> _markAttendance({required bool checkingIn}) async {
-    if (isCheckingLocation.value) return;
-
-    final startedAt = DateTime.now();
-    if (!_sameDay(attendance.value.date, startedAt)) {
-      if (!checkingIn) {
-        actionMessage.value = 'Check-out must happen on the check-in day.';
-        locationFailure.value = null;
-        return;
-      }
-      if (attendance.value.status != AttendanceStatus.notCheckedIn) {
-        _demoHistory.insert(0, attendance.value);
-        if (_demoHistory.length > 5) _demoHistory.removeLast();
-      }
-      attendance.value = AttendanceModel(
-        date: DateTime(startedAt.year, startedAt.month, startedAt.day),
-      );
+    if (isClosed ||
+        isLoading.value ||
+        isMarkingAttendance.value ||
+        storageError.value != null) {
+      return;
     }
-
-    final expected = checkingIn
-        ? AttendanceStatus.notCheckedIn
-        : AttendanceStatus.checkedIn;
-    if (attendance.value.status != expected) return;
-
-    isCheckingLocation.value = true;
+    isMarkingAttendance.value = true;
     actionMessage.value = null;
     locationFailure.value = null;
+    var attendanceSaved = false;
     try {
+      // Refresh before validating so state never relies only on the UI guard.
+      await _loadAttendance();
+      if (isClosed) return;
+      final startedAt = _now();
+      final requiredStatus = checkingIn
+          ? AttendanceStatus.notCheckedIn
+          : AttendanceStatus.checkedIn;
+      if (attendance.value.status != requiredStatus) {
+        actionMessage.value = checkingIn
+            ? 'Attendance is already marked for today.'
+            : 'Check in today before checking out.';
+        return;
+      }
       final location = await _locationService.validate();
-      if (isClosed || attendance.value.status != expected) return;
-      final now = DateTime.now();
-      if (!_sameDay(attendance.value.date, now)) {
+      if (isClosed) return;
+      final now = _now();
+      if (CompanyTime.attendanceDateKey(startedAt) !=
+          CompanyTime.attendanceDateKey(now)) {
         actionMessage.value = 'The attendance day changed. Please try again.';
         return;
       }
-      currentTime.value = now;
-      if (checkingIn) {
-        attendance.value = AttendanceModel(
-          date: DateTime(now.year, now.month, now.day),
-          checkInTime: now,
-          checkInLatitude: location.latitude,
-          checkInLongitude: location.longitude,
-        );
-        actionMessage.value = 'Checked in successfully.';
-      } else {
-        final record = attendance.value;
-        attendance.value = AttendanceModel(
-          date: record.date,
-          checkInTime: record.checkInTime,
-          checkInLatitude: record.checkInLatitude,
-          checkInLongitude: record.checkInLongitude,
-          checkOutTime: now,
-          checkOutLatitude: location.latitude,
-          checkOutLongitude: location.longitude,
-        );
-        actionMessage.value = 'Checked out successfully.';
+      await _attendanceStore.saveEvent(
+        AttendanceEvent(
+          id: const Uuid().v4(),
+          employeeId: employee.id,
+          companyDate: CompanyTime.attendanceDateKey(now),
+          type: checkingIn
+              ? AttendanceEventType.checkIn
+              : AttendanceEventType.checkOut,
+          timestamp: now.toUtc(),
+          latitude: location.latitude,
+          longitude: location.longitude,
+        ),
+      );
+      attendanceSaved = true;
+      await _loadAttendance();
+      if (!isClosed) {
+        actionMessage.value = checkingIn
+            ? 'Check-in saved. Pending Sync.'
+            : 'Check-out saved. Pending Sync.';
       }
     } on AttendanceLocationException catch (error) {
       if (!isClosed) {
         actionMessage.value = error.message;
         locationFailure.value = error.reason;
       }
+    } on AttendanceStoreException catch (error) {
+      if (!isClosed) actionMessage.value = error.message;
+    } catch (_) {
+      if (!isClosed) {
+        storageError.value = attendanceSaved
+            ? 'Your attendance was saved, but we could not update the screen. Please try again.'
+            : 'We could not open your saved attendance. Please try again before checking in or out.';
+      }
     } finally {
-      if (!isClosed) isCheckingLocation.value = false;
+      if (!isClosed) {
+        isMarkingAttendance.value = false;
+        if (attendance.value.date != CompanyTime.attendanceDate(_now())) {
+          unawaited(refreshAttendance());
+        }
+      }
     }
   }
 
@@ -152,14 +202,10 @@ class DashboardController extends GetxController {
     }
   }
 
-  bool _sameDay(DateTime first, DateTime second) =>
-      first.year == second.year &&
-      first.month == second.month &&
-      first.day == second.day;
-
   @override
   void onClose() {
-    _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _workingDurationTimer?.cancel();
     super.onClose();
   }
 }

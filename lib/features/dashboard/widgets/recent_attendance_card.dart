@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:rebs_hrms_assignment/features/attendance/utils/attendance_formatters.dart';
 import 'package:rebs_hrms_assignment/features/attendance/models/attendance_model.dart';
+import 'package:rebs_hrms_assignment/features/attendance/utils/attendance_formatters.dart';
 
 class RecentAttendanceCard extends StatelessWidget {
   final List<AttendanceModel> records;
@@ -29,6 +29,12 @@ class RecentAttendanceCard extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(AttendanceFormatters.statusText(records[index].status)),
+              if (records[index].syncStatus != null)
+                Text(
+                  AttendanceFormatters.syncStatusText(
+                    records[index].syncStatus!,
+                  ),
+                ),
               Text(
                 'Check In: ${AttendanceFormatters.formatTime(records[index].checkInTime)}',
               ),

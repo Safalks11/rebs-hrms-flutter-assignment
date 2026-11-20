@@ -1,7 +1,12 @@
+import 'package:rebs_hrms_assignment/core/utils/company_time.dart';
+
+import 'attendance_event.dart';
+
 enum AttendanceStatus { notCheckedIn, checkedIn, checkedOut }
 
 class AttendanceModel {
   final DateTime date;
+  final AttendanceSyncStatus? syncStatus;
   final DateTime? checkInTime;
   final DateTime? checkOutTime;
   final double? checkInLatitude;
@@ -11,6 +16,7 @@ class AttendanceModel {
 
   const AttendanceModel({
     required this.date,
+    this.syncStatus,
     this.checkInTime,
     this.checkOutTime,
     this.checkInLatitude,
@@ -38,7 +44,9 @@ class AttendanceModel {
       return Duration.zero;
     }
 
-    final duration = (checkOutTime ?? now).difference(checkInTime!);
+    final endOfDay = CompanyTime.endOfDayUtc(date);
+    final end = checkOutTime ?? (now.isAfter(endOfDay) ? endOfDay : now);
+    final duration = end.difference(checkInTime!);
     return duration.isNegative ? Duration.zero : duration;
   }
 }

@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:rebs_hrms_assignment/features/attendance/utils/attendance_formatters.dart';
 import 'package:rebs_hrms_assignment/features/attendance/models/attendance_model.dart';
+import 'package:rebs_hrms_assignment/features/attendance/utils/attendance_formatters.dart';
 
 class AttendanceCard extends StatelessWidget {
   final AttendanceModel attendance;
   final Duration? duration;
   final VoidCallback onCheckIn;
   final VoidCallback onCheckOut;
-  final bool isCheckingLocation;
+  final bool isMarkingAttendance;
   final String? actionMessage;
   final String? resolutionLabel;
   final VoidCallback onResolveIssue;
@@ -18,7 +18,7 @@ class AttendanceCard extends StatelessWidget {
     this.duration,
     required this.onCheckIn,
     required this.onCheckOut,
-    required this.isCheckingLocation,
+    required this.isMarkingAttendance,
     required this.actionMessage,
     required this.resolutionLabel,
     required this.onResolveIssue,
@@ -41,6 +41,8 @@ class AttendanceCard extends StatelessWidget {
             Text(
               'Status: ${AttendanceFormatters.statusText(attendance.status)}',
             ),
+            if (attendance.syncStatus != null)
+              Text(AttendanceFormatters.syncStatusText(attendance.syncStatus!)),
             const SizedBox(height: 12),
 
             Row(
@@ -74,9 +76,9 @@ class AttendanceCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: isCheckingLocation ? null : onCheckIn,
+                  onPressed: isMarkingAttendance ? null : onCheckIn,
                   child: Text(
-                    isCheckingLocation ? 'Checking location...' : 'Check In',
+                    isMarkingAttendance ? 'Saving attendance...' : 'Check In',
                   ),
                 ),
               )
@@ -84,9 +86,9 @@ class AttendanceCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: isCheckingLocation ? null : onCheckOut,
+                  onPressed: isMarkingAttendance ? null : onCheckOut,
                   child: Text(
-                    isCheckingLocation ? 'Checking location...' : 'Check Out',
+                    isMarkingAttendance ? 'Saving attendance...' : 'Check Out',
                   ),
                 ),
               )

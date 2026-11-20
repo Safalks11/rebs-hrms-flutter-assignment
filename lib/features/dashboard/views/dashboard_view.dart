@@ -30,18 +30,32 @@ class DashboardScreen extends GetView<DashboardController> {
           children: [
             EmployeeCard(employee: controller.employee),
             const SizedBox(height: 16),
-            Obx(
-              () => AttendanceCard(
+            Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (controller.storageError.value != null) {
+                return Column(
+                  children: [
+                    Text(controller.storageError.value!),
+                    TextButton(
+                      onPressed: controller.refreshAttendance,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                );
+              }
+              return AttendanceCard(
                 attendance: controller.attendance.value,
-                duration: controller.getWorkingDuration,
+                duration: controller.workingDuration,
                 onCheckIn: controller.checkIn,
                 onCheckOut: controller.checkOut,
-                isCheckingLocation: controller.isCheckingLocation.value,
+                isMarkingAttendance: controller.isMarkingAttendance.value,
                 actionMessage: controller.actionMessage.value,
                 resolutionLabel: controller.resolutionLabel,
                 onResolveIssue: controller.resolveLocationFailure,
-              ),
-            ),
+              );
+            }),
             const SizedBox(height: 16),
             LeaveBalanceCard(
               casualDays: controller.casualLeaveBalance,
@@ -50,7 +64,7 @@ class DashboardScreen extends GetView<DashboardController> {
             const SizedBox(height: 16),
             Obx(
               () => RecentAttendanceCard(
-                records: controller.recentAttendanceRecords,
+                records: controller.recentAttendanceRecords.toList(),
               ),
             ),
           ],
