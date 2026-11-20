@@ -42,7 +42,7 @@ class AttendanceLocationException implements Exception {
       case AttendanceLocationFailure.permissionDeniedForever:
         return 'Allow location access in app settings to mark attendance.';
       case AttendanceLocationFailure.timedOut:
-        return 'Getting your location timed out. Please try again.';
+        return 'GPS could not get a fix. Move outdoors, keep Location on, and try again.';
       case AttendanceLocationFailure.unavailable:
         return 'Your current location is unavailable. Please try again.';
       case AttendanceLocationFailure.inaccurate:
@@ -75,8 +75,8 @@ class GeolocatorGateway implements LocationGateway {
   Future<AttendanceLocation> currentLocation() async {
     final position = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.best,
-        timeLimit: Duration(seconds: 15),
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 45),
       ),
     );
     return AttendanceLocation(

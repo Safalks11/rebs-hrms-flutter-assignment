@@ -39,19 +39,8 @@ function balances(state) {
   for (const request of state.requests) if (request.status !== 'rejected') result[request.type] -= days(request);
   return result;
 }
-export function seed(now) {
-  const today = date(dateKey(now));
-  const request = (id, offset, type, status) => ({
-    id, employeeId: employee.id, type,
-    startDate: new Date(today + offset * DAY).toISOString().slice(0, 10),
-    endDate: new Date(today + offset * DAY).toISOString().slice(0, 10),
-    reason: 'Seeded demonstration request', status,
-  });
-  return { version: 1, events: [], requests: [
-    request('seed-pending', 7, 'casual', 'pending'),
-    request('seed-approved', -2, 'sick', 'approved'),
-    request('seed-rejected', -4, 'casual', 'rejected'),
-  ] };
+export function seed() {
+  return { version: 1, events: [], requests: [] };
 }
 function distance(a, b, c, d) {
   const rad = n => n * Math.PI / 180;

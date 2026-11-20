@@ -34,7 +34,7 @@ The response should be `{"status":"ok"}`. For a physical phone, use `HOST=0.0.0.
 | GET | `/leave/requests` | Get leave history |
 | POST | `/leave/requests` | Submit a leave request |
 
-The fresh demo data has no attendance, three example leave requests, and available balances of 7 Casual and 4 Sick days. There is no login or authentication.
+A fresh server starts with no attendance or leave requests and balances of 8 Casual and 5 Sick days. There is no login or authentication.
 
 ## Test different responses
 
@@ -71,6 +71,6 @@ Errors include a `code` and `message`. Invalid input returns HTTP 400, conflicts
 npm test
 ```
 
-To restore demo data, stop the server, run `npm run reset`, then start it again. Resetting the server does not clear the Flutter app's local SQLite data. Run only one server process per data file. Optional settings are `PORT`, `DATA_FILE`, and `MOCK_DELAY_MS`.
+To clear server attendance and leave requests, stop the server, run `npm run reset`, then start it again. Resetting the server does not clear the Flutter app's local SQLite data. Run only one server process per data file. Optional settings are `PORT`, `DATA_FILE`, and `MOCK_DELAY_MS`.
 
 The mock API and its test cases were generated using AI (Codex).

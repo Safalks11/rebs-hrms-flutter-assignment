@@ -25,8 +25,8 @@ test('endpoint contracts and repeatable failures',async t=>{
  assert.equal((await api.request('/health')).body.status,'ok');
  assert.equal((await api.request('/employee/me')).body.id,'EMP001');
  assert.deepEqual((await api.request('/office')).body,{latitude:0,longitude:0});
- assert.deepEqual((await api.request('/leave/balance')).body,{casual:7,sick:4});
- assert.equal((await api.request('/leave/requests')).body.requests.length,3);
+ assert.deepEqual((await api.request('/leave/balance')).body,{casual:8,sick:5});
+ assert.equal((await api.request('/leave/requests')).body.requests.length,0);
  assert.deepEqual((await api.request('/attendance?month=2026-11')).body.events,[]);
  assert.equal((await api.request('/attendance?month=bad')).status,400);
  assert.equal((await api.request('/health?employeeId=bad')).status,422);
@@ -70,15 +70,15 @@ test('timeout after commit and leave rules survive restart',async t=>{
  assert.equal((await post({startDate:'2026-11-19'})).status,422);
  assert.equal((await post({endDate:'2026-11-20'})).status,422);
  assert.equal((await post({reason:'12345 6789'})).status,422);
- assert.equal((await post({startDate:'2026-12-01',endDate:'2026-12-08'})).status,422);
- assert.equal((await post({startDate:'2026-11-27',endDate:'2026-11-27'})).status,422);
+ assert.equal((await post({startDate:'2026-12-01',endDate:'2026-12-09'})).status,422);
  assert.equal((await post()).status,201);
+ assert.equal((await post({id:'overlap-day',startDate:'2026-11-22',endDate:'2026-11-22'})).status,422);
  assert.equal((await post()).status,200);
  assert.equal((await post({reason:'Changed reason'})).status,409);
  assert.equal((await post({id:'overlap',type:'sick',startDate:'2026-11-22',endDate:'2026-11-23'})).status,422);
- assert.equal((await api.request('/leave/balance')).body.casual,5);
+ assert.equal((await api.request('/leave/balance')).body.casual,6);
  await api.restart();
- assert.equal((await api.request('/leave/balance')).body.casual,5);
+ assert.equal((await api.request('/leave/balance')).body.casual,6);
 });
 test('startup rejects missing configuration and corrupt storage',async t=>{
  assert.throws(()=>config({}),/OFFICE/);
