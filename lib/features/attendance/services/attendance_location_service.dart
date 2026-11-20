@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:rebs_hrms_assignment/features/office_profile/models/office_location.dart';
-import 'package:rebs_hrms_assignment/features/office_profile/services/office_profile_store.dart';
 
 class AttendanceLocation {
   final double latitude;
@@ -35,7 +34,7 @@ class AttendanceLocationException implements Exception {
   String get message {
     switch (reason) {
       case AttendanceLocationFailure.officeNotConfigured:
-        return 'Set valid office coordinates in Office Profile before marking attendance.';
+        return 'Office coordinates are not configured. Set OFFICE_LATITUDE and OFFICE_LONGITUDE for this build.';
       case AttendanceLocationFailure.servicesDisabled:
         return 'Turn on location services and try again.';
       case AttendanceLocationFailure.permissionDenied:
@@ -89,21 +88,19 @@ class GeolocatorGateway implements LocationGateway {
 }
 
 class AttendanceLocationService {
-  final OfficeProfileStore officeStore;
   final LocationGateway gateway;
+  static const _latitude = String.fromEnvironment('OFFICE_LATITUDE');
+  static const _longitude = String.fromEnvironment('OFFICE_LONGITUDE');
 
-  AttendanceLocationService(this.officeStore, {LocationGateway? gateway})
+  AttendanceLocationService({LocationGateway? gateway})
     : gateway = gateway ?? GeolocatorGateway();
 
   Future<AttendanceLocation> validate() async {
-    final OfficeLocation? office;
-    try {
-      office = await officeStore.load();
-    } catch (_) {
-      throw const AttendanceLocationException(
-        AttendanceLocationFailure.officeNotConfigured,
-      );
-    }
+    final latitude = double.tryParse(_latitude);
+    final longitude = double.tryParse(_longitude);
+    final office = latitude == null || longitude == null
+        ? null
+        : OfficeLocation(latitude: latitude, longitude: longitude);
     if (office == null || !office.isValid) {
       throw const AttendanceLocationException(
         AttendanceLocationFailure.officeNotConfigured,

@@ -17,16 +17,7 @@ class DashboardScreen extends GetView<DashboardController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard'),
-        actions: [
-          IconButton(
-            tooltip: 'Office Profile',
-            icon: const Icon(Icons.location_on_outlined),
-            onPressed: () => Get.toNamed(AppRoutes.officeProfile),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Dashboard')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

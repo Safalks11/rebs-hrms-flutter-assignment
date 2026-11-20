@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
-import 'package:rebs_hrms_assignment/app/routes/app_routes.dart';
 import 'package:rebs_hrms_assignment/core/utils/company_time.dart';
 import 'package:rebs_hrms_assignment/features/attendance/models/attendance_event.dart';
 import 'package:rebs_hrms_assignment/features/attendance/models/attendance_model.dart';
@@ -238,8 +237,6 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
 
   String? get resolutionLabel {
     switch (locationFailure.value) {
-      case AttendanceLocationFailure.officeNotConfigured:
-        return 'Office Profile';
       case AttendanceLocationFailure.servicesDisabled:
       case AttendanceLocationFailure.permissionDeniedForever:
         return 'Settings';
@@ -250,9 +247,7 @@ class DashboardController extends GetxController with WidgetsBindingObserver {
 
   Future<void> resolveLocationFailure() async {
     final reason = locationFailure.value;
-    if (reason == AttendanceLocationFailure.officeNotConfigured) {
-      await Get.toNamed(AppRoutes.officeProfile);
-    } else if (reason != null) {
+    if (reason != null) {
       await _locationService.openSettings(reason);
     }
   }

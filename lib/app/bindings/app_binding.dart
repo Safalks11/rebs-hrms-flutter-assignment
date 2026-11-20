@@ -2,7 +2,6 @@ import 'package:get/get.dart';
 import 'package:rebs_hrms_assignment/core/services/app_database.dart';
 import 'package:rebs_hrms_assignment/features/attendance/services/attendance_location_service.dart';
 import 'package:rebs_hrms_assignment/features/attendance/services/attendance_store.dart';
-import 'package:rebs_hrms_assignment/features/office_profile/services/office_profile_store.dart';
 
 import '../../core/services/connectivity_service.dart';
 import '../../features/leave/services/leave_repository.dart';
@@ -17,16 +16,12 @@ class AppBinding extends Bindings {
       permanent: true,
     );
     leave.loadCache().catchError((Object _) {});
-    Get.put<OfficeProfileStore>(
-      OfficeProfileStore(Get.find<AppDatabase>()),
-      permanent: true,
-    );
     Get.put<AttendanceStore>(
       AttendanceStore(Get.find<AppDatabase>()),
       permanent: true,
     );
     Get.put<AttendanceLocationService>(
-      AttendanceLocationService(Get.find<OfficeProfileStore>()),
+      AttendanceLocationService(),
       permanent: true,
     );
   }
