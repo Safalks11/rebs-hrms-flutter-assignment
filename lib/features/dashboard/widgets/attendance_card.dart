@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:rebs_hrms_assignment/core/helper/attendance_formatters.dart';
+import 'package:rebs_hrms_assignment/features/attendance/utils/attendance_formatters.dart';
 import 'package:rebs_hrms_assignment/features/attendance/models/attendance_model.dart';
 
 class AttendanceCard extends StatelessWidget {
@@ -7,6 +7,10 @@ class AttendanceCard extends StatelessWidget {
   final Duration? duration;
   final VoidCallback onCheckIn;
   final VoidCallback onCheckOut;
+  final bool isCheckingLocation;
+  final String? actionMessage;
+  final String? resolutionLabel;
+  final VoidCallback onResolveIssue;
 
   const AttendanceCard({
     super.key,
@@ -14,6 +18,10 @@ class AttendanceCard extends StatelessWidget {
     this.duration,
     required this.onCheckIn,
     required this.onCheckOut,
+    required this.isCheckingLocation,
+    required this.actionMessage,
+    required this.resolutionLabel,
+    required this.onResolveIssue,
   });
 
   @override
@@ -66,16 +74,20 @@ class AttendanceCard extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: onCheckIn,
-                  child: const Text('Check In'),
+                  onPressed: isCheckingLocation ? null : onCheckIn,
+                  child: Text(
+                    isCheckingLocation ? 'Checking location...' : 'Check In',
+                  ),
                 ),
               )
             else if (attendance.status == AttendanceStatus.checkedIn)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: onCheckOut,
-                  child: const Text('Check Out'),
+                  onPressed: isCheckingLocation ? null : onCheckOut,
+                  child: Text(
+                    isCheckingLocation ? 'Checking location...' : 'Check Out',
+                  ),
                 ),
               )
             else
@@ -86,6 +98,15 @@ class AttendanceCard extends StatelessWidget {
                   child: Text('Checked Out'),
                 ),
               ),
+            if (actionMessage != null) ...[
+              const SizedBox(height: 12),
+              Text(actionMessage!),
+              if (resolutionLabel != null)
+                TextButton(
+                  onPressed: onResolveIssue,
+                  child: Text(resolutionLabel!),
+                ),
+            ],
           ],
         ),
       ),

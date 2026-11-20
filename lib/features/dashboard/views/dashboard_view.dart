@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:rebs_hrms_assignment/app/routes/app_routes.dart';
 import 'package:rebs_hrms_assignment/features/dashboard/controllers/dashboard_controller.dart';
 import 'package:rebs_hrms_assignment/features/dashboard/widgets/attendance_card.dart';
 import 'package:rebs_hrms_assignment/features/dashboard/widgets/employee_card.dart';
@@ -12,7 +13,16 @@ class DashboardScreen extends GetView<DashboardController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Dashboard')),
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+        actions: [
+          IconButton(
+            tooltip: 'Office Profile',
+            icon: const Icon(Icons.location_on_outlined),
+            onPressed: () => Get.toNamed(AppRoutes.officeProfile),
+          ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -26,6 +36,10 @@ class DashboardScreen extends GetView<DashboardController> {
                 duration: controller.getWorkingDuration,
                 onCheckIn: controller.checkIn,
                 onCheckOut: controller.checkOut,
+                isCheckingLocation: controller.isCheckingLocation.value,
+                actionMessage: controller.actionMessage.value,
+                resolutionLabel: controller.resolutionLabel,
+                onResolveIssue: controller.resolveLocationFailure,
               ),
             ),
             const SizedBox(height: 16),

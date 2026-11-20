@@ -4,11 +4,19 @@ class AttendanceModel {
   final DateTime date;
   final DateTime? checkInTime;
   final DateTime? checkOutTime;
+  final double? checkInLatitude;
+  final double? checkInLongitude;
+  final double? checkOutLatitude;
+  final double? checkOutLongitude;
 
   const AttendanceModel({
     required this.date,
     this.checkInTime,
     this.checkOutTime,
+    this.checkInLatitude,
+    this.checkInLongitude,
+    this.checkOutLatitude,
+    this.checkOutLongitude,
   });
 
   AttendanceStatus get status {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:rebs_hrms_assignment/core/helper/attendance_formatters.dart';
+import 'package:rebs_hrms_assignment/features/attendance/utils/attendance_formatters.dart';
 import 'package:rebs_hrms_assignment/features/attendance/models/attendance_model.dart';
 
 class RecentAttendanceCard extends StatelessWidget {
